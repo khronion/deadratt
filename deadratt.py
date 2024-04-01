@@ -35,6 +35,14 @@ print("""
 
 session = NSSession("dead_ratt", VERSION, "Isle Khronion", user)
 
+print("""
+t       - Target a region
+<ENTER> - Poll a targeted region for updates
+
+c       - Check a region's key details
+d       - view current time Delta
+o       - Override time delta
+""")
 
 delta = 0 # used to offset predictions
 target = ""
@@ -84,12 +92,51 @@ while True:
                     # store eta
                     last_known_update = update
 
-                    print("  Target set. Use 'p' to poll target for updates.")
+                    print("  Target set. Use <ENTER> to poll target for updates.")
 
                 else:
                     print("  Region recently updated. Select new target.")
 
-            case "p":
+            case "c":
+                major = int(session.api_request(api="region", target=selection, shard="lastmajorupdate")["lastmajorupdate"])
+                minor = int(session.api_request(api="region", target=selection, shard="lastminorupdate")["lastminorupdate"])
+                delegate = session.api_request(api="region", target=selection, shard="delegate")["delegate"]
+                endos = session.api_request(api="region", target=selection, shard="delegatevotes")["delegatevotes"]
+                tags = session.api_request(api="region", target=selection, shard="tags")["tags"]["tag"]
+                print("""Region: {region}
+    Delegate: {delegate} ({endos}e)
+    Governor: {has_governor}
+    Password: {has_password}
+    
+    Next Major (estimate): {major_eta}s
+    Next Minor (estimate): {minor_eta}s
+                """.format(
+                    region = selection,
+                    delegate = delegate,
+                    endos = endos,
+                    has_governor = "Governorless" not in tags,
+                    has_password = "Password" in tags,
+                    major_eta = major+86400-int(time()),
+                    minor_eta = minor+86400-int(time())))
+            case "d":
+                print("  Delta currently set to {}s".format(delta))
+                print("  Use o to manually override.")
+            case "o":
+                print("**Manually overriding delta.")
+                print("**Old delta: {}s".format(delta))
+                delta = int(selection)
+                print("**New delta: {}s".format(delta))
+            case "q":
+                exit()
+            case "h":
+                print("valid commands are:")
+                print("  t - Target a region")
+                print("  c - Check a region")
+                print("  d - Discover delta value")
+                print("  o - Override delta value")
+                print("  ENTER - Ping target region and check for update")
+
+            case _:
                 if mode == '1':
                     current_update = int(session.api_request(api="region", target=target, shard="lastmajorupdate")["lastmajorupdate"])
                 else:
@@ -105,41 +152,8 @@ while True:
                 else:
                     print("  Target Region: {}".format(target))
                     print("  Target ETA:    {} seconds".format(last_known_update + 86400 + delta - int(time())))
-            case "c":
-                major = int(session.api_request(api="region", target=selection, shard="lastmajorupdate")["lastmajorupdate"])
-                minor = int(session.api_request(api="region", target=selection, shard="lastminorupdate")["lastminorupdate"])
-                delegate = session.api_request(api="region", target=selection, shard="delegate")["delegate"]
-                endos = session.api_request(api="region", target=selection, shard="delegatevotes")["delegatevotes"]
-                tags = session.api_request(api="region", target=selection, shard="tags")["tags"]["tag"]
-                print("""Region: {region}
-    Delegate: {delegate} ({endos}e)
-    Governor: {has_governor}
-    Password: {has_password}
-    
-    Next Major (estimate): {major_eta}s
-    Next Minor (estimate): {minor_eta}s
-                """.format(
-                    region = target,
-                    delegate = delegate,
-                    endos = endos,
-                    has_governor = "Governorless" not in tags,
-                    has_password = "Password" in tags,
-                    major_eta = major+86400-int(time()),
-                    minor_eta = minor+86400-int(time())))
-            case "d":
-                print("  Delta currently set to {}s".format(delta))
-                print("  Use o to manually override.")
-            case "o":
-                print("**Manually overriding delta.")
-                print("**Old delta: {}s".format(delta))
-                delta = int(selection)
-                print("**New delta: {}s".format(delta))
-            case _:
-                print("**Invalid command. Valid commands are:")
-                print("  t - Target a region")
-                print("  p - Ping a target")
-                print("  c - Check a region")
-                print("  d - Discover delta value")
-                print("  o - Override delta value")
+
     except HTTPStatusError:
         print("**Error: {} does not exist.".format(selection))
+    except ValueError:
+        print("**Error: No target specified.")
